@@ -23,7 +23,7 @@ public class MemoController {
 
     @GetMapping
     public List<Map<String, Object>> list() {
-        log.info("메모 조회 요청 수신");
+        log.info("메모 조회 요청 수신 22222");
 
         List<Map<String, Object>> result = jdbc.queryForList(
                 "SELECT FID, FTITLE, FCONTENT, FCREATED_AT FROM MEMO ORDER BY FID DESC");
