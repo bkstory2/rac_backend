@@ -1,0 +1,56 @@
+# ===============================
+# 서버 설정
+# ===============================
+server:
+  port: 9999
+
+# ===============================
+# 스프링 설정
+# ===============================
+spring:
+  application:
+    name: memo-server
+  
+  # ===============================
+  # 데이터베이스 설정 (SQL Server)
+  # ===============================
+  datasource:
+    driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+    url: jdbc:log4jdbc:sqlserver://localhost:1433;databaseName=RAT;encrypt=true;trustServerCertificate=true;
+    username: sa
+    password: "1"  # 숫자 1은 따옴표로 감싸는 것이 좋습니다
+    hikari:
+      auto-commit: true
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # ===============================
+  # JPA 설정 (필요한 경우)
+  # ===============================
+  jpa:
+    hibernate:
+      ddl-auto: validate  # none, validate, update, create, create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.SQLServerDialect
+  
+  # ===============================
+  # 로깅 설정
+  # ===============================
+  logging:
+    level:
+      root: INFO
+      org.springframework.web: DEBUG
+      org.hibernate: INFO
+      com.memo1: DEBUG
+    file:
+      name: logs/application.log
+    pattern:
+      console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+      file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+

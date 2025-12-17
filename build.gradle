@@ -1,0 +1,58 @@
+// build.gradle 전체 내용 수정
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'           // Spring Boot 3.2.0
+    id 'io.spring.dependency-management' version '1.1.4'   // 호환되는 버전
+}
+
+group = 'com.memo1'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'com.microsoft.sqlserver:mssql-jdbc:12.4.2.jre11'
+    implementation 'org.bgee.log4jdbc-log4j2:log4jdbc-log4j2-jdbc4.1:1.16'
+    
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// bootJar 설정 최적화
+bootJar {
+    archiveFileName = "${project.name}.jar"
+    mainClass = 'com.memo1.memo_server.MemoServerApplication'
+}
+
+jar {
+    enabled = true
+    archiveClassifier = ''  // plain jar
+}
+
+// Gradle 8.x 호환성 설정
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
