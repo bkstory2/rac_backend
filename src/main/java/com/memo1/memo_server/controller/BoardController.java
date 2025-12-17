@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.ResultSet;
@@ -18,8 +17,6 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/board")
-@CrossOrigin(origins = "*")
-@Transactional
 public class BoardController {
 
     private final JdbcTemplate jdbc;
@@ -40,7 +37,155 @@ public class BoardController {
         }
     };
 
-    // ==================== 게시판 목록 조회 ====================
+    // ==================== 게시판 정보 조회 (React용) ====================
+
+    /**
+     * 게시판 정보 조회
+     * React에서 요구하는 API 형식으로 반환
+     * 
+     * @param brCd 게시판 코드 (B1, B2, B3)
+     */
+    @GetMapping("/info")
+    public ResponseEntity<Map<String, Object>> getBoardInfo(@RequestParam String brCd) {
+        log.info("게시판 정보 조회 - BR_CD: {}", brCd);
+
+        try {
+            // DB에서 게시판 정보 조회 (TBOARD 테이블이 아니라 게시판 정보 테이블이 있다고 가정)
+            // 만약 별도의 게시판 정보 테이블이 없으면 기본 정보 반환
+            Map<String, Object> boardInfo = new HashMap<>();
+
+            // 게시판 이름 매핑
+            String brNm = "";
+            String description = "";
+
+            switch (brCd) {
+                case "B1":
+                    brNm = "공지사항";
+                    description = "공지사항 게시판입니다.";
+                    break;
+                case "B2":
+                    brNm = "자유게시판";
+                    description = "자유롭게 글을 작성할 수 있는 게시판입니다.";
+                    break;
+                case "B3":
+                    brNm = "문의게시판";
+                    description = "문의사항을 올리는 게시판입니다.";
+                    break;
+                default:
+                    brNm = "게시판 " + brCd;
+                    description = brCd + " 게시판입니다.";
+            }
+
+            boardInfo.put("brNm", brNm);
+            boardInfo.put("brCd", brCd);
+            boardInfo.put("description", description);
+            boardInfo.put("totalPosts", getBoardPostCount(brCd));
+
+            log.info("게시판 정보 반환: {}", boardInfo);
+            return ResponseEntity.ok(boardInfo);
+
+        } catch (Exception e) {
+            log.error("게시판 정보 조회 오류: {}", e.getMessage());
+
+            // 에러 발생 시 기본 정보 반환
+            Map<String, Object> defaultInfo = new HashMap<>();
+            defaultInfo.put("brNm", "게시판 " + brCd);
+            defaultInfo.put("brCd", brCd);
+            defaultInfo.put("description", "게시판 " + brCd + "입니다.");
+            defaultInfo.put("totalPosts", 0);
+
+            return ResponseEntity.ok(defaultInfo);
+        }
+    }
+
+    // ==================== 게시글 목록 조회 (React용) ====================
+
+    /**
+     * 게시글 목록 조회 (페이지네이션 지원)
+     * React에서 요구하는 API 형식으로 반환
+     * 
+     * @param brCd 게시판 코드
+     * @param page 페이지 번호 (기본값: 1)
+     * @param size 페이지 크기 (기본값: 10)
+     */
+    @GetMapping("/posts")
+    public ResponseEntity<Map<String, Object>> getBoardPosts(
+            @RequestParam String brCd,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        log.info("게시글 목록 조회 - BR_CD: {}, page: {}, size: {}", brCd, page, size);
+
+        try {
+            // 페이지 번호 보정
+            if (page < 1)
+                page = 1;
+
+            // 오프셋 계산
+            int offset = (page - 1) * size;
+
+            // 총 게시글 수 조회
+            int totalCount = getBoardPostCount(brCd);
+            int totalPages = (int) Math.ceil((double) totalCount / size);
+
+            // 게시글 목록 조회
+            String sql = "SELECT * FROM TBOARD WHERE BR_CD = ? " +
+                    "ORDER BY BR_SEQ DESC " +
+                    "OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+
+            List<Map<String, Object>> posts = jdbc.query(
+                    sql,
+                    boardRowMapper,
+                    brCd, offset, size);
+
+            // React에서 요구하는 형식으로 변환
+            List<Map<String, Object>> formattedPosts = posts.stream()
+                    .map(post -> {
+                        Map<String, Object> formatted = new HashMap<>();
+                        formatted.put("id", post.get("br_seq"));
+                        formatted.put("postId", post.get("br_seq"));
+                        formatted.put("title", post.get("br_title"));
+                        formatted.put("postTitle", post.get("br_title"));
+                        formatted.put("content", post.get("br_content"));
+                        formatted.put("postContent", post.get("br_content"));
+                        formatted.put("author", post.get("br_reg_id"));
+                        formatted.put("createdBy", post.get("br_reg_id"));
+                        formatted.put("createdAt", post.get("br_reg_dt"));
+                        formatted.put("date", post.get("br_reg_dt"));
+                        formatted.put("viewCount", 0); // 조회수 필드가 없으면 0
+                        formatted.put("views", 0);
+                        formatted.put("commentCount", 0); // 댓글수 필드가 없으면 0
+                        return formatted;
+                    })
+                    .toList();
+
+            // 응답 데이터 구성
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("content", formattedPosts);
+            response.put("totalPages", totalPages);
+            response.put("currentPage", page);
+            response.put("totalElements", totalCount);
+            response.put("size", size);
+
+            log.info("게시글 목록 조회 성공: {}개 항목, 총 {}페이지", formattedPosts.size(), totalPages);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("게시글 목록 조회 오류: {}", e.getMessage());
+
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("content", List.of());
+            errorResponse.put("totalPages", 0);
+            errorResponse.put("currentPage", page);
+            errorResponse.put("totalElements", 0);
+            errorResponse.put("message", "게시글 목록 조회 중 오류가 발생했습니다.");
+
+            return ResponseEntity.ok(errorResponse); // 에러도 200 OK로 반환 (React에서 처리)
+        }
+    }
+
+    // ==================== 게시판 목록 조회 (기존) ====================
 
     /**
      * 게시판 목록 조회
@@ -203,5 +348,32 @@ public class BoardController {
         stats.put("boards", List.of("A1", "A2", "A3"));
 
         return stats;
+    }
+
+    // ==================== 헬퍼 메서드 ====================
+
+    /**
+     * 게시판별 게시글 수 조회
+     */
+    private int getBoardPostCount(String brCd) {
+        try {
+            Integer count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM TBOARD WHERE BR_CD = ?",
+                    Integer.class,
+                    brCd);
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("게시글 수 조회 오류: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * OPTIONS 요청 처리 (CORS 프리플라이트)
+     */
+    @RequestMapping(value = "/**", method = RequestMethod.OPTIONS)
+    public ResponseEntity<Void> handleOptions() {
+        log.debug("OPTIONS 요청 처리");
+        return ResponseEntity.ok().build();
     }
 }
