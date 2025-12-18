@@ -291,6 +291,10 @@ public class BoardController {
                 brCd, searchKeyword, searchKeyword, offset, size
             );
             
+
+
+
+            ////////////////////
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("content", posts);
